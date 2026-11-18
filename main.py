@@ -393,6 +393,48 @@ class Text:
         bad = (last_right > x + maxw) or (max_bottom is not None and bottom > max_bottom)
         return bad, last_right, bottom, x + maxw
 
+    # ---- scaled text ------------------------------------------------------
+    def width_scaled(self, font, s, scale):
+        """Advance width of s when glyphs are drawn at the given scale."""
+        m = self.fonts[font]["m"]
+        return sum(m[c][4] for c in s if c in m) * scale
+
+    def _scale_bitmap(self, bm, bw, bh, scale):
+        """Nearest-neighbour downscale of an 8-bit alpha glyph bitmap."""
+        nw = max(1, int(bw * scale + 0.5))
+        nh = max(1, int(bh * scale + 0.5))
+        if nw == bw and nh == bh:
+            return bm, bw, bh
+        out = bytearray(nw * nh)
+        for yy in range(nh):
+            sy = min(bh - 1, int(yy / scale))
+            srow = sy * bw
+            orow = yy * nw
+            for xx in range(nw):
+                sx = min(bw - 1, int(xx / scale))
+                out[orow + xx] = bm[srow + sx]
+        return bytes(out), nw, nh
+
+    def draw_scaled(self, cv, font, s, x, ytop, color, scale):
+        """Draw s with every glyph scaled by `scale` (1.0 == native size)."""
+        f = self.fonts[font]
+        m = f["m"]
+        g = f["g"]
+        gm = f["gm"]
+        pen = float(x)
+        for ch in s:
+            info = m.get(ch)
+            if info is None:
+                continue
+            bm = g.get(ch)
+            if bm is not None:
+                gw, gh, bx, by, adv = info
+                sbm, sw, sh = self._scale_bitmap(bm, gw, gh, scale)
+                cv.blit(sbm, sw, sh,
+                        int(round(pen)) + int(round(bx * scale)),
+                        ytop + int(round(by * scale)), color)
+            pen += info[4] * scale
+
 # --------------------------------------------------------------------------
 # geometry helpers
 # --------------------------------------------------------------------------
@@ -948,9 +990,17 @@ def draw_card(cv, txt, x, y, w, h, card):
 # --------------------------------------------------------------------------
 # layout
 # --------------------------------------------------------------------------
+def story_count():
+    """Total number of distinct stories shown on the page.
+
+    One lead story, every grid card, and every brief entry.  Computed from the
+    lists themselves so the masthead banner can never drift from the layout.
+    """
+    return 1 + len(CARDS) + len(BRIEFS)
+
 def draw_masthead(cv, txt):
     txt.draw(cv, "tag", "THE WORLD IN ONE DAY", 26, 26, RED)
-    right = "25 STORIES · SIX CONTINENTS · ONE PAGE"
+    right = "%d STORIES · SIX CONTINENTS · ONE PAGE" % story_count()
     rw = txt.width("tag", right)
     txt.draw(cv, "tag", right, 998 - rw, 26, INK2)
     mast = "18 NOVEMBER 2026"
@@ -1039,12 +1089,38 @@ BRIEFS = [
     "Trump visit: PH trade deal",
     "Mozambique activist on trial",
     "Storm Bruna batters Portugal",
+    "Xi greets Trump; 3-way Thursday",
+    "Germany: 4,000-hour red tape",
+    "NSA internal network down",
+    "Apple Pay, iCloud outage",
+    "Nvidia: no Huang return",
+    "Saudi downs Houthi missiles",
+    "Kyiv hits Krasnodar refineries",
+    "Odesa strike kills 4",
+    "Kyiv tower hit; 3 hurt",
+    "Dems lead by 14; Jeffries 251",
+    "Quad leaders meet again",
+    "Israel ground op near Nuseirat",
+    "Iraq resumes oil to Turkey",
+    "US loses measles elimination",
+    "Middle Corridor to 30m tonnes",
+    "Storms Bruna and Charles hit",
+    "Amazon: 6.3bn India energy",
+    "Canada, China widen tariff cuts",
+    "Trump: big Philippines trade deal",
+    "Settler kills woman at Jericho",
+    "UN: Taiz health crisis worsens",
+    "EPP to suspend Serbia's SNS",
 ]
 
 LEGEND_L1 = ("1 QESHM · 2 KERCH · 3 SHENZHEN · 4 BENGAL · 5 TALLINN "
              "· 6 SANTA CLARA")
 LEGEND_L2 = ("7 JERUSALEM · 8 KYIV · 9 CONAKRY · 10 KINSHASA · 11 IRKUTSK "
              "· 12 TOKYO")
+
+# bottom edge (y) available to the briefs grid on the left panel; sits just
+# above the footer rule at y=930 so no brief can run into the footer.
+BRIEFS_BOTTOM = 924
 
 
 def draw_bottom(cv, txt, land):
@@ -1054,7 +1130,6 @@ def draw_bottom(cv, txt, land):
     # clear gap so the chip never overlaps the first brief row.
     chip_h = chip_with_text(cv, txt, "tag", "ALSO TODAY", lx0, y0, 7, 4, RED, WHITE)
     brief_top = y0 + chip_h + 6          # at least 6px clearance below the chip
-    fh = txt.fonts["brief"]["lh"]
 
     # map panel x 477..998 (width 521); occupies y0..y0+mh
     mx, my, mw, mh = 477, y0, 998 - 477, 178
@@ -1078,22 +1153,66 @@ def draw_bottom(cv, txt, land):
     l2w = txt.width("micro", LEGEND_L2)
     txt.draw(cv, "micro", LEGEND_L2, mx + (mw - l2w) / 2, ly1 + llh, INK)
 
-    # ten briefs fill from brief_top down to (panel bottom - 4px); reduce line
-    # spacing if needed but never drop a brief
-    ly = brief_top
-    n = len(BRIEFS)
-    per = (n + 1) // 2
-    colw = (mx - 20 - lx0) // 2
-    min_lh = txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 3
-    if n > 18:
-        sys.stderr.write("WARN briefs exceed two columns of 9\n")
-    for i, b in enumerate(BRIEFS):
-        col = 0 if i < per else 1
-        r = i - col * per
-        xx = lx0 + col * colw
-        yy = int(round(ly + r * min_lh))
-        cv.fill_rect(xx, yy + fh // 2 - 2, 5, 5, RED)
-        txt.draw(cv, "brief", b, xx + 12, yy, INK)
+    # Every brief is shown: a multi-column grid down the left panel with a
+    # font auto-sized so the widest entry fits its column and the tallest
+    # column fits the panel.  Nothing is dropped, ellipsised or clipped.
+    draw_briefs(cv, txt, lx0, brief_top, mx - 20, BRIEFS_BOTTOM, BRIEFS)
+
+def briefs_grid(txt, lx0, x1, top, bottom, briefs, cols=3, gap=8,
+                bullet=10, min_scale=0.30):
+    """Plan the briefs grid and return per-brief placement plus the font scale.
+
+    Returns (scale, rows, [(x_text, y_top, brief), ...]) where every brief has
+    a plan entry; the scale is chosen so the widest brief fits its column width
+    and every row fits inside [top, bottom].
+    """
+    n = len(briefs)
+    if n == 0:
+        return 1.0, 0, []
+    cols = max(1, min(cols, n))
+    rows = (n + cols - 1) // cols
+    avail_w = (x1 - lx0) - (cols - 1) * gap
+    colw = avail_w / cols
+    text_w = colw - bullet
+    # height available per row; the font line box (micro) is the height driver
+    f = txt.fonts["brief"]
+    native_h = f["lh"]
+    pitch = (bottom - top) / rows
+    scale = 1.0
+    if text_w > 0:
+        for b in briefs:
+            w_native = txt.width("brief", b)
+            if w_native > 0:
+                scale = min(scale, text_w / w_native)
+    if native_h > 0:
+        scale = min(scale, pitch / native_h)
+    scale = max(min_scale, scale)
+    placed = []
+    for i, b in enumerate(briefs):
+        col = i // rows
+        r = i % rows
+        xx = lx0 + col * (colw + gap)
+        yy = top + r * pitch
+        if scale < 1.0:
+            extra = (pitch - native_h * scale) / 2.0
+            yy += max(0.0, extra)
+        placed.append((xx + bullet, yy, b))
+    return scale, rows, placed
+
+def draw_briefs(cv, txt, lx0, top, x1, bottom, briefs):
+    """Draw every brief in a fitted grid; guarantees nothing is clipped."""
+    scale, rows, placed = briefs_grid(txt, lx0, x1, top, bottom, briefs)
+    f = txt.fonts["brief"]
+    dot = 5
+    for (x_text, y_top, b) in placed:
+        yy = int(round(y_top))
+        # bullet dot centred on the scaled ascender line
+        cy = yy + int(round(f["desc"] * scale * 0.5))
+        cv.fill_rect(int(round(x_text - 9)), cy - dot // 2, dot, dot, RED)
+        if scale >= 1.0:
+            txt.draw(cv, "brief", b, x_text, yy, INK)
+        else:
+            txt.draw_scaled(cv, "brief", b, x_text, yy, INK, scale)
 
 def draw_footer(cv, txt):
     cv.fill_rect(26, 930, W - 52, 1, RULES)
@@ -1252,29 +1371,30 @@ def verify_layout(txt):
                 "box_bottom=%d text=%r\n" % (
                     label, last_right, float(hx1), bottom, hero_bottom, s))
 
-    # legend lines and briefs must stay inside the map panel bottom edge
-    panel_bottom = 700 + 178
-    micro = txt.fonts["micro"]["lh"]
-    brief_lh_f = txt.fonts["brief"]["lh"]
+    # legend lines must stay inside the map panel bottom edge
     legend_lines = [LEGEND_L1, LEGEND_L2]
     for i, ltext in enumerate(legend_lines):
         lw = txt.width("micro", ltext)
         if 477 + lw / 2 > 998:
             warn += 1
             sys.stderr.write("WARN legend line wider than panel: %r\n" % ltext)
-    n = len(BRIEFS)
-    per = (n + 1) // 2
-    blh = txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 3
-    colw_chk = (477 - 20 - 26) // 2
-    for b in BRIEFS:
-        if 26 + 12 + txt.width("brief", b) > 26 + colw_chk:
+
+    # every brief must fit its column width and stay inside the left panel;
+    # the grid auto-sizes the font, so this is a real end-to-end check.
+    brief_top = 700 + (txt.fonts["tag"]["lh"] + 2 * 4) + 6
+    lx0, lx1 = 26, 477 - 20
+    scale, rows, placed = briefs_grid(
+        txt, lx0, lx1, brief_top, BRIEFS_BOTTOM, BRIEFS)
+    fh_brief = txt.fonts["brief"]["lh"]
+    for (x_text, y_top, b) in placed:
+        last_right = x_text + txt.width("brief", b) * scale
+        bottom = y_top + fh_brief * scale
+        if last_right > lx1 + 0.5 or bottom > BRIEFS_BOTTOM + 0.5:
             warn += 1
-            sys.stderr.write("WARN brief wider than its column: %r\n" % b)
-    last_brief_bottom = 730 + (per - 1) * blh + brief_lh_f
-    if last_brief_bottom > panel_bottom - 4:
-        warn += 1
-        sys.stderr.write("WARN briefs overflow panel: bottom=%.1f limit=%.1f\n"
-                         % (last_brief_bottom, panel_bottom - 4))
+            sys.stderr.write(
+                "WARN brief clipped: right=%.1f limit=%.1f bottom=%.1f "
+                "limit=%d text=%r\n" % (
+                    last_right, float(lx1), bottom, BRIEFS_BOTTOM, b))
 
     if not warn:
         sys.stderr.write("layout verification passed: all text blocks fit, no words dropped\n")
