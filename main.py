@@ -950,7 +950,7 @@ def draw_card(cv, txt, x, y, w, h, card):
 # --------------------------------------------------------------------------
 def draw_masthead(cv, txt):
     txt.draw(cv, "tag", "THE WORLD IN ONE DAY", 26, 26, RED)
-    right = "21 STORIES · SIX CONTINENTS · ONE PAGE"
+    right = "25 STORIES · SIX CONTINENTS · ONE PAGE"
     rw = txt.width("tag", right)
     txt.draw(cv, "tag", right, 998 - rw, 26, INK2)
     mast = "18 NOVEMBER 2026"
@@ -1021,25 +1021,24 @@ def draw_grid(cv, txt):
 
 
 BRIEFS = [
-    "Zelensky sets out a five-point peace plan",
-    "Guinea jails 224 in a gold-mining crackdown",
-    "DRC Ebola at record pace: 11,000 cases",
-    "Russian jet crashes in Siberia, killing 19",
-    "Intel investors sue after a 29% plunge",
-    "US measles cases pass 5,400; ten dead",
-    "Iran strikes Kuwait and Bahrain; US hit Qeshm",
-    "EU proposes a 45bn-euro Ukraine loan",
-    "Waymo pulls driverless taxis off US highways",
-    "Voyager 1 passes a light-day from Earth, 49 years on",
-    "Pope Leo flies home after a 12-day tour",
-    "GTA VI billboards rise from Tokyo to Sydney",
-    "US soldier held in Britain on spying suspicion",
-    "Japan scrambles jets as Russian planes near",
-    "Iran strikes Kuwait and Bahrain; US hit Qeshm",
-    "EU proposes a 45bn-euro Ukraine loan",
-    "Waymo pulls driverless taxis off US highways",
-    "Voyager 1 passes a light-day from Earth, 49 years on",
-    "GTA VI billboards rise from Tokyo to Sydney",
+    "Zelensky: 5-point peace plan",
+    "Guinea jails 224 over gold",
+    "DRC Ebola: record 11,000",
+    "Siberia jet crash kills 19",
+    "Intel investors sue over 29%",
+    "US measles: 5,400 cases",
+    "Iran strikes Kuwait and Bahrain",
+    "EU offers 45bn-euro Kyiv loan",
+    "Waymo halts US robotaxis",
+    "Voyager 1: a light-day out",
+    "Pope Leo ends 12-day tour",
+    "GTA VI billboards worldwide",
+    "Japan scrambles jets at Russia",
+    "Iraq oil resumes via Turkey",
+    "Canada eases China tariffs",
+    "Trump visit: PH trade deal",
+    "Mozambique activist on trial",
+    "Storm Bruna batters Portugal",
 ]
 
 LEGEND_L1 = ("1 QESHM · 2 KERCH · 3 SHENZHEN · 4 BENGAL · 5 TALLINN "
@@ -1083,17 +1082,18 @@ def draw_bottom(cv, txt, land):
     # spacing if needed but never drop a brief
     ly = brief_top
     n = len(BRIEFS)
-    target_bottom = panel_bottom - 4
-    if n > 1:
-        lh = (target_bottom - fh - ly) / (n - 1)
-    else:
-        lh = fh
-    min_lh = txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 6
-    lh = max(min_lh, lh)
+    per = (n + 1) // 2
+    colw = (mx - 20 - lx0) // 2
+    min_lh = txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 3
+    if n > 18:
+        sys.stderr.write("WARN briefs exceed two columns of 9\n")
     for i, b in enumerate(BRIEFS):
-        yy = int(round(ly + i * lh))
-        cv.fill_rect(lx0, yy + fh // 2 - 2, 5, 5, RED)
-        txt.draw(cv, "brief", b, lx0 + 12, yy, INK)
+        col = 0 if i < per else 1
+        r = i - col * per
+        xx = lx0 + col * colw
+        yy = int(round(ly + r * min_lh))
+        cv.fill_rect(xx, yy + fh // 2 - 2, 5, 5, RED)
+        txt.draw(cv, "brief", b, xx + 12, yy, INK)
 
 def draw_footer(cv, txt):
     cv.fill_rect(26, 930, W - 52, 1, RULES)
@@ -1263,9 +1263,14 @@ def verify_layout(txt):
             warn += 1
             sys.stderr.write("WARN legend line wider than panel: %r\n" % ltext)
     n = len(BRIEFS)
-    blh = max(txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 6,
-              (panel_bottom - 4 - brief_lh_f - 700) / (n - 1))
-    last_brief_bottom = 700 + (n - 1) * blh + brief_lh_f
+    per = (n + 1) // 2
+    blh = txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 3
+    colw_chk = (477 - 20 - 26) // 2
+    for b in BRIEFS:
+        if 26 + 12 + txt.width("brief", b) > 26 + colw_chk:
+            warn += 1
+            sys.stderr.write("WARN brief wider than its column: %r\n" % b)
+    last_brief_bottom = 730 + (per - 1) * blh + brief_lh_f
     if last_brief_bottom > panel_bottom - 4:
         warn += 1
         sys.stderr.write("WARN briefs overflow panel: bottom=%.1f limit=%.1f\n"
