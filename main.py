@@ -48,6 +48,17 @@ GREY = (118, 120, 126)
 DARKGREY = (60, 62, 68)
 YELLOW = (238, 200, 74)
 SMOKE = (150, 152, 158)
+NIGHT = (18, 22, 40)
+MOON_GLOW = (60, 66, 92)
+MOON_CRATER = (206, 172, 64)
+JET_GREY = (128, 132, 140)
+JET_GREY2 = (104, 108, 118)
+TRACER = (232, 182, 90)
+DESERT = (150, 122, 82)
+DESERT_EDGE = (120, 96, 62)
+DESERT_DUNE = (168, 140, 98)
+RADAR_GREY = (128, 118, 108)
+FLAME = (240, 154, 44)
 
 
 # --------------------------------------------------------------------------
@@ -437,10 +448,13 @@ def draw_map(cv, txt, land, x, y, w, h):
     return mw, mh
 
 
+# pin place names: Qeshm, Kerch, Shenzhen, Bay of Bengal, Tallinn,
+# Santa Clara, Jerusalem, Kyiv, Conakry, Kinshasa, Irkutsk, Tokyo
 PINS = [
-    (1, 114.06, 22.54), (2, 121.0, 14.6), (3, 56.5, 26.5), (4, 30.5, 50.45),
-    (5, -77.04, 38.9), (6, 6.15, 46.2), (7, 30.7, 36.9), (8, 34.5, 31.5),
-    (9, 45.0, 12.8), (10, 38.7, 9.0), (11, -66.9, 10.5), (12, 12.5, 41.9),
+    (1, 55.9, 26.8), (2, 36.5, 45.3), (3, 114.06, 22.54),
+    (4, 87.0, 17.0), (5, 24.75, 59.44), (6, -121.96, 37.35),
+    (7, 35.2, 31.77), (8, 30.5, 50.45), (9, -13.68, 9.51),
+    (10, 15.3, -4.32), (11, 104.3, 52.3), (12, 139.7, 35.7),
 ]
 
 PIN_RED = RED
@@ -670,8 +684,89 @@ def icon_leaf(cv, x, y, s):
     cv.scanline_polygon(leaf, GREEN)
     cv.line(cx - r + 10, cy + 2, cx + r - 10, cy - 2, PAPER, 1)
 
-ICON_FNS = [icon_ship_escort, icon_bridge_wrench, icon_columns,
-            icon_flags3, icon_robot_gavel, icon_leaf]
+def icon_bridge_burst(cv, x, y, s):
+    # bridge deck on two piers with a suspension arc
+    deck_y = y + s - 20
+    cv.fill_rect(x + 4, deck_y, s - 8, 4, GREY)
+    for px in (x + 10, x + s // 2, x + s - 12):
+        cv.fill_rect(px, deck_y + 4, 3, 12, DARKGREY)
+    arc_x0, arc_x1 = x + 6, x + s - 6
+    arc_y = deck_y - 16
+    n = 14
+    for i in range(n + 1):
+        t = i / n
+        ax = arc_x0 + t * (arc_x1 - arc_x0)
+        sag = int(10 * (1 - (2 * t - 1) ** 2))
+        cv.fill_rect(int(ax), arc_y + sag, 1, deck_y - (arc_y + sag), GREY)
+    cv.fill_rect(arc_x0, arc_y, arc_x1 - arc_x0, 2, GREY)
+    # a red burst where the arch has been blown apart
+    bx = x + s // 2
+    by = arc_y + 2
+    cv.fill_rect(bx - 8, by - 3, 16, 6, RED)
+    cv.fill_rect(bx - 3, by - 8, 6, 16, RED)
+    cv.fill_rect(bx - 6, by - 6, 12, 12, RED)
+    cv.disc(bx, by, 3, (230, 70, 78))
+
+def icon_three_flags(cv, x, y, s):
+    pole_top = y + 6
+    for i, col in enumerate((RED, BLUE_SEA, GREEN)):
+        px = x + i * (s // 3) + 2
+        cv.fill_rect(px, pole_top, 2, s - 12, DARKGREY)
+        cv.fill_rect(px + 2, pole_top + 2, s // 4 + 2, s // 4, col)
+        cv.fill_rect(px + 2, pole_top + 2, s // 4 + 2, 1, INK)
+
+def icon_cyclone(cv, x, y, s):
+    import math as _m
+    cx = x + s // 2
+    cy = y + s // 2
+    for arm in range(3):
+        a0 = arm * 2.0943951
+        for i in range(30):
+            t = i / 29.0
+            r = (s // 2 - 6) * t
+            a = a0 + t * 2.6
+            px = cx + r * _m.cos(a)
+            py = cy + r * _m.sin(a)
+            cv.fill_rect(int(px), int(py), 2, 2, ORANGE)
+    cv.disc(cx, cy, 3, RED)
+
+def icon_fence(cv, x, y, s):
+    top = y + 12
+    bot = y + s - 8
+    for i in range(4):
+        px = x + 6 + i * ((s - 14) // 3)
+        cv.fill_rect(px, top, 3, bot - top, GREY)
+    cv.fill_rect(x + 4, top + 8, s - 8, 3, DARKGREY)
+    cv.fill_rect(x + 4, bot - 14, s - 8, 3, DARKGREY)
+
+def icon_chip(cv, x, y, s):
+    cx = x + s // 2
+    cy = y + s // 2
+    half = s // 4
+    cv.fill_rect(cx - half, cy - half, 2 * half, 2 * half, DARKGREY)
+    cv.fill_rect(cx - half + 4, cy - half + 4, 2 * half - 8, 2 * half - 8, GREY)
+    cv.fill_rect(cx - 4, cy - 4, 8, 8, GREEN)
+    for i in range(3):
+        off = -half + 4 + i * ((2 * half - 8) // 2)
+        cv.fill_rect(cx - half - 5, cy + off, 5, 2, INK2)
+        cv.fill_rect(cx + half, cy + off, 5, 2, INK2)
+        cv.fill_rect(cx + off, cy - half - 5, 2, 5, INK2)
+        cv.fill_rect(cx + off, cy + half, 2, 5, INK2)
+
+def icon_podium(cv, x, y, s):
+    base_y = y + s - 8
+    # rostrum block
+    cv.fill_rect(x + 6, base_y - 12, s - 12, 12, INK)
+    cv.fill_rect(x + 6, base_y - 12, s - 12, 2, INK2)
+    # a figure behind the lectern
+    cv.disc(x + s // 2, y + 12, 6, INK2)
+    cv.fill_rect(x + s // 2 - 7, y + 18, 14, 14, DARKGREY)
+    # angled lectern top
+    cv.scanline_polygon([(x + s // 2 - 12, y + 26), (x + s // 2 + 12, y + 22),
+                         (x + s // 2 + 12, y + 28), (x + s // 2 - 12, y + 32)], GREY)
+
+ICON_FNS = [icon_bridge_burst, icon_chip, icon_three_flags,
+            icon_cyclone, icon_podium, icon_fence]
 
 
 # --------------------------------------------------------------------------
@@ -680,64 +775,80 @@ ICON_FNS = [icon_ship_escort, icon_bridge_wrench, icon_columns,
 def draw_illustration(cv, txt, x, y, w, h):
     cap_h = 22
     body_h = h - cap_h
-    cv.fill_rect(x, y, w, body_h, BLUE_SEA)
-    # subtle sky bands on the upper part
-    for i in range(4):
-        cv.fill_rect(x, y + int(i * body_h * 0.55 / 4), w, 2, (40, 86, 134))
-    # water occupies the lower 45%
-    water_top = y + int(body_h * 0.62)
-    cv.fill_rect(x, water_top, w, y + body_h - water_top, TEAL)
-    cv.fill_rect(x, water_top, w, 2, (58, 116, 140))
-    # three thin horizontal wave lines on the water
-    for k in range(3):
-        wy = water_top + 12 + k * 12
-        dash = 0
-        while dash < w:
-            seg = 14 if (dash // 14) % 2 == 0 else 8
-            cv.fill_rect(x + dash, wy, min(seg, w - dash), 1, (86, 140, 162))
-            dash += seg + 6
-    # modern skyline silhouette behind the water: three towers of different
-    # heights rising from the shoreline
-    shore_y = water_top + 4
-    towers = ((0.14, 96, 40), (0.42, 150, 54), (0.68, 118, 44))
-    for fx, th, tw in towers:
-        tx = x + int(w * fx) - tw // 2
-        cv.fill_rect(tx, shore_y - th, tw, th, INK)
-        # a lit crown on each tower
-        cv.fill_rect(tx + tw // 2 - 2, shore_y - th - 8, 4, 8, DARKGREY)
-    # a low band of smaller blocks along the shoreline
-    bx = x + 6
-    bw = 18
-    while bx < x + w - 6:
-        bh = 14 + ((bx // bw) % 3) * 6
-        cv.fill_rect(bx, shore_y - bh, bw - 4, bh, DARKGREY)
-        bx += bw
-    # red carpet strip on the near shore
-    carpet_y = y + body_h - 12
-    cv.fill_rect(x + int(w * 0.18), carpet_y, int(w * 0.64), 8, RED)
-    cv.fill_rect(x + int(w * 0.18), carpet_y, int(w * 0.64), 2, (220, 70, 78))
-    # three small aircraft descending on approach lines
-    for fx, fy, adx, ady in ((0.30, 0.20, 26, 18),
-                             (0.54, 0.12, 30, 22),
-                             (0.78, 0.30, 22, 16)):
-        ax = x + int(w * fx)
-        ay = y + int(body_h * fy)
-        cv.line(ax - adx, ay - ady, ax, ay, GREY, 1)
-        cv.fill_rect(ax - 6, ay - 1, 12, 3, INK)
-        cv.fill_rect(ax - 1, ay - 4, 3, 9, INK)
-    # two small black bird "V" glyphs in the sky
-    for bx0, by0, bs in ((x + int(w * 0.16), y + int(body_h * 0.16), 7),
-                         (x + int(w * 0.30), y + int(body_h * 0.26), 5)):
-        cv.line(bx0 - bs, by0, bx0, by0 + bs, INK, 1)
-        cv.line(bx0, by0 + bs, bx0 + bs, by0, INK, 1)
-    # yellow sun smaller, top-right corner
-    sun_x = x + w - 34
-    sun_y = y + 30
-    cv.disc(sun_x, sun_y, 14, YELLOW)
-    cv.ring(sun_x, sun_y, 16, GOLD, 1)
+    body_bottom = y + body_h
+    # dark night sky
+    cv.fill_rect(x, y, w, body_h, NIGHT)
+    # a few faint stars
+    for sx, sy in ((x + 30, y + 24), (x + 72, y + 14), (x + 210, y + 20),
+                   (x + 258, y + 40), (x + 150, y + 34)):
+        cv.fill_rect(sx, sy, 2, 2, (120, 130, 160))
+    # yellow moon with a soft halo in the upper left
+    cv.ring(x + 74, y + 66, 30, MOON_GLOW, 3)
+    cv.disc(x + 74, y + 66, 20, YELLOW)
+    cv.disc(x + 68, y + 60, 4, MOON_CRATER)
+    cv.disc(x + 82, y + 74, 3, MOON_CRATER)
+    # two grey jets banking diagonally across the sky, each trailing tracers
+    def jet(cx, cy, col):
+        # fuselage
+        cv.fill_rect(cx - 14, cy - 3, 30, 6, col)
+        # nose
+        cv.scanline_polygon([(cx + 16, cy - 3), (cx + 24, cy), (cx + 16, cy + 3)], col)
+        # swept wings as a single triangle through the body
+        cv.scanline_polygon([(cx - 2, cy - 2), (cx + 12, cy - 16),
+                             (cx + 2, cy - 2)], col)
+        cv.scanline_polygon([(cx - 2, cy + 2), (cx + 12, cy + 16),
+                             (cx + 2, cy + 2)], col)
+        # tail fin
+        cv.scanline_polygon([(cx - 16, cy - 2), (cx - 22, cy - 14),
+                             (cx - 10, cy - 2)], col)
+    # lower jet, banking up to the right with tracer lines behind it
+    j1x, j1y = x + int(w * 0.42), y + int(body_h * 0.40)
+    for i in range(3):
+        tx = j1x - 30 - i * 16
+        ty = j1y + 10 + i * 5
+        cv.line(tx, ty, tx + 30, ty - 6, TRACER, 1)
+    jet(j1x, j1y, JET_GREY)
+    # upper jet, higher and nearer the right edge
+    j2x, j2y = x + int(w * 0.72), y + int(body_h * 0.22)
+    for i in range(2):
+        tx = j2x - 28 - i * 16
+        ty = j2y + 8 + i * 5
+        cv.line(tx, ty, tx + 28, ty - 5, TRACER, 1)
+    jet(j2x, j2y, JET_GREY2)
+    # desert band across the lower part of the frame
+    desert_top = y + int(body_h * 0.66)
+    cv.fill_rect(x, desert_top, w, body_bottom - desert_top, DESERT)
+    cv.fill_rect(x, desert_top, w, 2, DESERT_EDGE)
+    # a couple of low dunes
+    for dx, dw in ((x + 10, 120), (x + 200, 150)):
+        cv.scanline_polygon([(dx, desert_top + 16), (dx + dw // 2, desert_top + 4),
+                             (dx + dw, desert_top + 16)], DESERT_DUNE)
+    # damaged radar dome on the right of the desert band, with flames
+    rx = x + int(w * 0.74)
+    ry = desert_top - 6
+    # pedestal legs
+    cv.fill_rect(rx - 14, ry + 4, 4, 22, DARKGREY)
+    cv.fill_rect(rx + 10, ry + 4, 4, 22, DARKGREY)
+    # dome, dented on top
+    cv.scanline_polygon([(rx - 22, ry + 6), (rx - 16, ry - 12),
+                         (rx - 4, ry - 20), (rx + 8, ry - 18),
+                         (rx + 12, ry - 6), (rx + 22, ry + 6)], RADAR_GREY)
+    cv.fill_rect(rx - 22, ry + 4, 44, 4, DARKGREY)
+    # a gouge torn out of the dome
+    cv.scanline_polygon([(rx + 2, ry - 18), (rx + 16, ry - 14),
+                         (rx + 10, ry - 2), (rx - 2, ry - 6)], NIGHT)
+    # orange flames licking out of the gouge
+    cv.scanline_polygon([(rx - 2, ry - 16), (rx + 4, ry - 34),
+                         (rx + 10, ry - 16)], ORANGE)
+    cv.scanline_polygon([(rx + 6, ry - 14), (rx + 14, ry - 30),
+                         (rx + 18, ry - 10)], FLAME)
+    cv.fill_rect(rx - 2, ry - 8, 22, 4, ORANGE)
+    # two grey smoke puffs drifting up off the flames
+    cv.ring(rx + 2, ry - 44, 12, SMOKE, 4)
+    cv.ring(rx + 10, ry - 30, 9, SMOKE, 3)
     # caption bar at the bottom
     cv.fill_rect(x, y + body_h, w, cap_h, INK)
-    cap = "THE SHENZHEN SUMMIT VENUE, WEDNESDAY 18 NOVEMBER 2026"
+    cap = "THE QESHM SITE AFTER THE US STRIKE, WEDNESDAY"
     cw = txt.width("micro", cap)
     txt.draw(cv, "micro", cap, x + (w - cw) / 2, y + body_h + 5, WHITE)
 
@@ -745,18 +856,18 @@ def draw_illustration(cv, txt, x, y, w, h):
 # story cards
 # --------------------------------------------------------------------------
 CARDS = [
-    ("MIDDLE EAST · HORMUZ", RED, "GULF TENSIONS SPIRAL",
-     "Insurers suspend Gulf cover as navies plan escorted convoys", 0),
-    ("EUROPE · KYIV", BLUE_SEA, "KYIV BEGINS REPAIRS",
-     "Engineers assess the Dnipro crossings after Tuesday's strikes", 1),
-    ("AMERICAS · WASHINGTON", GREEN, "MARKETS STEADY AGAIN",
-     "JPMorgan says Monday's outage was a software fault; calm returns", 2),
-    ("ASIA · MANILA", ORANGE, "ASEAN SIGNS TRADE PACT",
-     "The summit's second day delivers a Thailand supply-chain deal", 3),
-    ("EUROPE · GENEVA", BLUE_SEA, "KILLER-ROBOT TALKS ADVANCE",
-     "Delegates table a binding text on autonomous weapons", 4),
-    ("CLIMATE · ANTALYA", GREEN, "COP31 DRAFT SPARKS FIGHT",
-     "Island states resist a softening of the fossil-fuel language", 5),
+    ("EUROPE · KERCH", BLUE_SEA, "KERCH ROAD ARCH FALLS",
+     "Ukraine's strikes toppled the road arch; Russia pounds Kyiv's bridges", 1),
+    ("ASIA · SHENZHEN", ORANGE, "THURSDAY: THE THREE-WAY",
+     "Xi, Trump and Putin arrive; a Kim meeting is dangled on the sidelines", 3),
+    ("ASIA · BAY OF BENGAL", ORANGE, "CYCLONE AKVAN BUILDS",
+     "Flights cancelled as the storm strengthens toward the coast", 3),
+    ("EUROPE · TALLINN", BLUE_SEA, "ESTONIA SHUTS BORDER",
+     "The move follows a 'sabotage' bid at a drone maker", 5),
+    ("AMERICAS · SANTA CLARA", GREEN, "NVIDIA BEATS FORECASTS",
+     "First earnings since the exit; the board refuses to reinstate Huang", 2),
+    ("MIDDLE EAST · JERUSALEM", RED, "KNESSET PICKS KAHANA",
+     "An Eisenkot ally becomes speaker, a blow to Netanyahu", 4),
 ]
 
 
@@ -839,7 +950,7 @@ def draw_card(cv, txt, x, y, w, h, card):
 # --------------------------------------------------------------------------
 def draw_masthead(cv, txt):
     txt.draw(cv, "tag", "THE WORLD IN ONE DAY", 26, 26, RED)
-    right = "ONE IMAGE · EVERY CONTINENT"
+    right = "21 STORIES · SIX CONTINENTS · ONE PAGE"
     rw = txt.width("tag", right)
     txt.draw(cv, "tag", right, 998 - rw, 26, INK2)
     mast = "18 NOVEMBER 2026"
@@ -856,19 +967,20 @@ def draw_hero(cv, txt):
     x0, x1 = 26, 590
     y0 = 150
     hero_bottom = 150 + 248
-    bx = chip_with_text(cv, txt, "tag", "LEAD · ASIA", x0, y0, 7, 4, RED, WHITE)
+    bx = chip_with_text(cv, txt, "tag", "LEAD · MIDDLE EAST", x0, y0, 7, 4, RED, WHITE)
     hy = y0 + bx + 12
     hlw = x1 - x0
-    hlines = txt.fit("hero", "WORLD LEADERS CONVERGE ON SHENZHEN", hlw)
+    hero_head = "US AND IRAN TRADE FIRE"
+    hlines = txt.fit("hero", hero_head, hlw)
     if len(hlines) > 3:
         hlines = hlines[:3]
     lh = txt.fonts["hero"]["lh"] - 6
     for i, ln in enumerate(hlines):
         txt.draw(cv, "hero", ln, x0, hy + i * lh, INK)
     dy = hy + len(hlines) * lh + 8
-    deck = ("Xi, Trump and Putin arrive for Thursday's first-ever three-way "
-            "summit. Advance teams haggle over the closing statement: nuclear "
-            "risks, Ukraine, trade.")
+    deck = ("US jets hit a missile site on Qeshm Island after Iran's drones "
+            "struck a US radar in Bahrain. No casualties reported on either "
+            "side.")
     dlines = txt.fit("hero2", deck, hlw)
     if len(dlines) > 3:
         dlines = dlines[:3]
@@ -881,7 +993,7 @@ def draw_hero(cv, txt):
             dlead = max(min_dlh, avail / len(dlines))
     for i, ln in enumerate(dlines):
         txt.draw(cv, "hero2", ln, x0, int(round(dy + i * dlead)), DECK_INK)
-    for font, s, ytop, lead in (("hero", "WORLD LEADERS CONVERGE ON SHENZHEN",
+    for font, s, ytop, lead in (("hero", hero_head,
                                  hy, lh), ("hero2", deck, dy, dlead)):
         bad, last_right, bottom, box_r = txt.block_overflow(
             font, s, x0, hlw, ytop, hero_bottom, maxlines=3, leading=lead)
@@ -909,22 +1021,26 @@ def draw_grid(cv, txt):
 
 
 BRIEFS = [
-    "NVIDIA shares swing after its post-Huang earnings",
-    "Gaza crossings open to a first aid convoy",
-    "Houthis press their advance toward Aden",
-    "Ethiopia and Eritrea trade border strikes",
-    "Five states detail the Rwanda returns hub",
-    "Washington weighs Singapore's chip request",
-    "Venezuela halts oil shipments pending US talks",
-    "Le Pen tables her retirement-age bill",
-    "EU prepares its answer in the Temu case",
-    "Pope Leo flies home to a warm Rome welcome",
+    "Zelensky sets out a five-point peace plan",
+    "Guinea jails 224 in a gold-mining crackdown",
+    "DRC Ebola at record pace: 11,000 cases",
+    "Russian jet crashes in Siberia, killing 19",
+    "Intel investors sue after a 29% plunge",
+    "US measles cases pass 5,400; ten dead",
+    "Australia's pay gap falls below 20%",
+    "Dhoni ends his IPL career; CSK make him mentor",
+    "India beat Pakistan 2-1 for a 10th SAFF title",
+    "Félix Gallardo, Mexican drug lord, dies at 80",
+    "Pope Leo flies home after a 12-day tour",
+    "Google signs a geothermal deal in Oregon",
+    "US soldier held in Britain on spying suspicion",
+    "Japan scrambles jets as Russian planes near",
 ]
 
-LEGEND_L1 = ("1 SHENZHEN · 2 MANILA · 3 HORMUZ · 4 KYIV · 5 WASHINGTON "
-             "· 6 GENEVA")
-LEGEND_L2 = ("7 ANTALYA · 8 GAZA · 9 ADEN · 10 ADDIS ABABA · 11 CARACAS "
-             "· 12 ROME")
+LEGEND_L1 = ("1 QESHM · 2 KERCH · 3 SHENZHEN · 4 BENGAL · 5 TALLINN "
+             "· 6 SANTA CLARA")
+LEGEND_L2 = ("7 JERUSALEM · 8 KYIV · 9 CONAKRY · 10 KINSHASA · 11 IRKUTSK "
+             "· 12 TOKYO")
 
 
 def draw_bottom(cv, txt, land):
@@ -979,8 +1095,7 @@ def draw_footer(cv, txt):
     bar_y = 940
     bar_h = 20
     cv.fill_rect(26, bar_y, W - 52, bar_h, INK)
-    ticker = ("MARKETS: NVIDIA SWINGS POST-EARNINGS · GULF INSURERS SUSPEND "
-              "COVER · BRENT $94.10")
+    ticker = "MARKETS: NVIDIA BEATS FORECASTS · INTEL SUITS AFTER A 29% PLUNGE · OIL UP ON THE QESHM STRIKES"
     tw = txt.width("brief", ticker)
     txt.draw(cv, "brief", ticker, 26 + (W - 52 - tw) / 2, bar_y + 3, GOLD)
     ly = bar_y + bar_h + 8
@@ -1098,10 +1213,10 @@ def verify_layout(txt):
     hx0, hx1 = 26, 590
     hero_bottom = 150 + 248
     hero_hlw = hx1 - hx0
-    hero_head = "WORLD LEADERS CONVERGE ON SHENZHEN"
-    hero_deck = ("Xi, Trump and Putin arrive for Thursday's first-ever three-way "
-                 "summit. Advance teams haggle over the closing statement: "
-                 "nuclear risks, Ukraine, trade.")
+    hero_head = "US AND IRAN TRADE FIRE"
+    hero_deck = ("US jets hit a missile site on Qeshm Island after Iran's drones "
+                 "struck a US radar in Bahrain. No casualties reported on either "
+                 "side.")
     hy0 = 150 + (txt.fonts["tag"]["lh"] + 8) + 12
     hh_lines = txt.fit("hero", hero_head, hero_hlw)[:3]
     hh_lead = txt.fonts["hero"]["lh"] - 6
