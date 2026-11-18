@@ -865,7 +865,7 @@ CARDS = [
     ("EUROPE · TALLINN", BLUE_SEA, "ESTONIA SHUTS BORDER",
      "The move follows a 'sabotage' bid at a drone maker", 5),
     ("AMERICAS · SANTA CLARA", GREEN, "NVIDIA BEATS FORECASTS",
-     "First earnings since the exit; the board refuses to reinstate Huang", 2),
+     "Beat on earnings; the board keeps Huang out; China sales halted", 2),
     ("MIDDLE EAST · JERUSALEM", RED, "KNESSET PICKS KAHANA",
      "An Eisenkot ally becomes speaker, a blow to Netanyahu", 4),
 ]
@@ -1027,14 +1027,19 @@ BRIEFS = [
     "Russian jet crashes in Siberia, killing 19",
     "Intel investors sue after a 29% plunge",
     "US measles cases pass 5,400; ten dead",
-    "Australia's pay gap falls below 20%",
-    "Dhoni ends his IPL career; CSK make him mentor",
-    "India beat Pakistan 2-1 for a 10th SAFF title",
-    "Félix Gallardo, Mexican drug lord, dies at 80",
+    "Iran strikes Kuwait and Bahrain; US hit Qeshm",
+    "EU proposes a 45bn-euro Ukraine loan",
+    "Waymo pulls driverless taxis off US highways",
+    "Voyager 1 passes a light-day from Earth, 49 years on",
     "Pope Leo flies home after a 12-day tour",
-    "Google signs a geothermal deal in Oregon",
+    "GTA VI billboards rise from Tokyo to Sydney",
     "US soldier held in Britain on spying suspicion",
     "Japan scrambles jets as Russian planes near",
+    "Iran strikes Kuwait and Bahrain; US hit Qeshm",
+    "EU proposes a 45bn-euro Ukraine loan",
+    "Waymo pulls driverless taxis off US highways",
+    "Voyager 1 passes a light-day from Earth, 49 years on",
+    "GTA VI billboards rise from Tokyo to Sydney",
 ]
 
 LEGEND_L1 = ("1 QESHM · 2 KERCH · 3 SHENZHEN · 4 BENGAL · 5 TALLINN "
@@ -1083,7 +1088,7 @@ def draw_bottom(cv, txt, land):
         lh = (target_bottom - fh - ly) / (n - 1)
     else:
         lh = fh
-    min_lh = txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 3
+    min_lh = txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 6
     lh = max(min_lh, lh)
     for i, b in enumerate(BRIEFS):
         yy = int(round(ly + i * lh))
@@ -1258,7 +1263,7 @@ def verify_layout(txt):
             warn += 1
             sys.stderr.write("WARN legend line wider than panel: %r\n" % ltext)
     n = len(BRIEFS)
-    blh = max(txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 3,
+    blh = max(txt.fonts["brief"]["asc"] + txt.fonts["brief"]["desc"] - 6,
               (panel_bottom - 4 - brief_lh_f - 700) / (n - 1))
     last_brief_bottom = 700 + (n - 1) * blh + brief_lh_f
     if last_brief_bottom > panel_bottom - 4:
