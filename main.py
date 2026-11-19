@@ -1041,10 +1041,60 @@ def draw_masthead(cv, txt):
     cv.fill_rect(26, 132, W - 52, 1, INK)
 
 
+# --------------------------------------------------------------------------
+# day-in-numbers strip + region bar (directly under the masthead)
+# --------------------------------------------------------------------------
+# The masthead rules end at y=133.  The number strip and the region bar are
+# stacked immediately below it; every section that used to start at the
+# masthead bottom is shifted down by TOP_SHIFT so nothing overlaps and the
+# whole page still lands inside the 1024px canvas.
+NUM_TOP = 137          # top rule of the numbers strip
+NUM_FIG_TOP = 140      # top of the bold-red figures
+NUM_LAB_TOP = 164      # small dark-grey capitals under each figure
+NUM_BOT = 176          # bottom rule of the numbers strip
+BAR_TOP = 180          # region bar top edge
+BAR_H = 13             # region bar height
+TOP_SHIFT = 49         # net downward shift applied to every section below
+
+# one muted segment colour per REGION_ORDER entry (existing palette only)
+REGION_COLORS = [BLUE_SEA, TEAL, GREEN, RED, ORANGE, TEAL, GREY]
+
+def draw_number_strip(cv, txt):
+    """Six equal columns: bold-red figure over a dark-grey capital label."""
+    x0, x1 = 26, 998
+    cv.fill_rect(x0, NUM_TOP, x1 - x0, 1, INK)
+    n = len(NUMBERS)
+    colw = (x1 - x0) / n
+    for i, (fig, lab) in enumerate(NUMBERS):
+        cx = x0 + i * colw
+        fw = txt.width("card", fig)
+        txt.draw(cv, "card", fig, cx + (colw - fw) / 2, NUM_FIG_TOP, RED)
+        lw = txt.width("micro", lab)
+        txt.draw(cv, "micro", lab, cx + (colw - lw) / 2, NUM_LAB_TOP, DARKGREY)
+    cv.fill_rect(x0, NUM_BOT, x1 - x0, 1, INK)
+
+def draw_region_bar(cv, txt):
+    """Full-width segmented bar: one muted segment per region, with counts."""
+    counts = region_counts()
+    x0, x1 = 26, 998
+    n = len(REGION_ORDER)
+    segw = (x1 - x0) / n
+    mlh = txt.fonts["micro"]["lh"]
+    for i, region in enumerate(REGION_ORDER):
+        col = REGION_COLORS[i % len(REGION_COLORS)]
+        sx = x0 + i * segw
+        cv.fill_rect(int(round(sx)), BAR_TOP, int(round(segw)) + 1, BAR_H, col)
+        label = "%s %d" % (region.upper(), counts[region])
+        lw = txt.width("micro", label)
+        # white on the dark muted segments; ink on the light ones
+        fg = INK if col in (GOLD, YELLOW) else WHITE
+        txt.draw(cv, "micro", label, sx + (segw - lw) / 2,
+                 BAR_TOP + (BAR_H - mlh) / 2, fg)
+
 def draw_hero(cv, txt):
     x0, x1 = 26, 590
-    y0 = 150
-    hero_bottom = 150 + 248
+    y0 = 150 + TOP_SHIFT
+    hero_bottom = y0 + 248
     bx = chip_with_text(cv, txt, "tag", "LEAD · MIDDLE EAST", x0, y0, 7, 4, RED, WHITE)
     hy = y0 + bx + 12
     hlw = x1 - x0
@@ -1079,7 +1129,7 @@ def draw_hero(cv, txt):
             sys.stderr.write(
                 "WARN overflow hero/%s: last_x=%.1f box_r=%.1f bottom=%.1f "
                 "box_bottom=%d\n" % (font, last_right, box_r, bottom, hero_bottom))
-    draw_illustration(cv, txt, 610, 150, 388, 248)
+    draw_illustration(cv, txt, 610, y0, 388, 248)
 
 
 def draw_grid(cv, txt):
@@ -1089,7 +1139,7 @@ def draw_grid(cv, txt):
     gutter = 10
     cell_w = (gw - (cols - 1) * gutter) // cols
     row_h = 132
-    y0 = 415
+    y0 = 415 + TOP_SHIFT
     for i, card in enumerate(CARDS):
         r = i // cols
         c = i % cols
@@ -1184,9 +1234,13 @@ NUMBERS = [
 # above the footer rule at y=930 so no brief can run into the footer.
 BRIEFS_BOTTOM = 924
 
+# y of the footer's top rule.  The whole footer (DATE CHECK box, markets bar
+# and credits line) sits below it and must stay inside the canvas.
+FOOT_RULE = 930
+
 
 def draw_bottom(cv, txt, land):
-    y0 = 700
+    y0 = 700 + TOP_SHIFT
     lx0 = 26
     # "ALSO TODAY" tag sits on its own line; the briefs start below it with a
     # clear gap so the chip never overlaps the first brief row.
@@ -1218,7 +1272,8 @@ def draw_bottom(cv, txt, land):
     # Every brief is shown: a multi-column grid down the left panel with a
     # font auto-sized so the widest entry fits its column and the tallest
     # column fits the panel.  Nothing is dropped, ellipsised or clipped.
-    draw_briefs(cv, txt, lx0, brief_top, mx - 20, BRIEFS_BOTTOM, BRIEFS)
+    draw_briefs(cv, txt, lx0, brief_top, mx - 20,
+                BRIEFS_BOTTOM + TOP_SHIFT, BRIEFS)
 
 def briefs_grid(txt, lx0, x1, top, bottom, briefs, cols=3, gap=8,
                 bullet=10, min_scale=0.30):
@@ -1277,15 +1332,37 @@ def draw_briefs(cv, txt, lx0, top, x1, bottom, briefs):
             txt.draw_scaled(cv, "brief", b, x_text, yy, INK, scale)
 
 def draw_footer(cv, txt):
-    cv.fill_rect(26, 930, W - 52, 1, RULES)
-    bar_y = 940
+    rule_y = FOOT_RULE + TOP_SHIFT
+    cv.fill_rect(26, rule_y, W - 52, 1, RULES)
+
+    # ---- DATE CHECK box: five events deliberately excluded from the page ----
+    bx, by = 26, rule_y + 5
+    bw = W - 52
+    padx, pady = 10, 6
+    tag_lh = txt.fonts["tag"]["lh"]
+    mlh = txt.fonts["micro"]["lh"]
+    ev1 = "Trump-Xi-Putin summit for Thu; Cyclone Akvan Fri; COP31 close"
+    ev2 = "Anthropic first trading day; ICJ Rohingya verdict"
+    note = ("Every story on this page happened or was first reported "
+            "on Wednesday 18 November 2026.")
+    bh = pady + tag_lh + 2 * mlh + mlh + pady
+    cv.fill_rect(bx, by, bw, bh, PAPER)
+    cv.frame(bx, by, bw, bh, RED)
+    txt.draw(cv, "tag", "DATE CHECK", bx + padx, by + pady, RED)
+    tx_events = bx + padx + txt.width("tag", "DATE CHECK") + 14
+    txt.draw(cv, "micro", ev1, tx_events, by + pady + 2, INK)
+    txt.draw(cv, "micro", ev2, tx_events, by + pady + 2 + mlh, INK)
+    txt.draw(cv, "micro", note, bx + padx, by + pady + tag_lh + 2 * mlh + 2, INK2)
+
+    # ---- markets ticker (Nvidia beat already runs as the Santa Clara card) ----
+    bar_y = by + bh + 6
     bar_h = 20
     cv.fill_rect(26, bar_y, W - 52, bar_h, INK)
-    ticker = "MARKETS: NVIDIA BEATS FORECASTS · INTEL SUITS AFTER A 29% PLUNGE · OIL UP ON THE QESHM STRIKES"
+    ticker = "MARKETS: INTEL SUITS AFTER A 29% PLUNGE · OIL UP ON THE QESHM STRIKES"
     tw = txt.width("brief", ticker)
     txt.draw(cv, "brief", ticker, 26 + (W - 52 - tw) / 2, bar_y + 3, GOLD)
     ly = bar_y + bar_h + 8
-    txt.draw(cv, "micro", "COMPILED FROM WIRE REPORTS · ALL STORIES FROM WEDNESDAY 18 NOVEMBER 2026",
+    txt.draw(cv, "micro", "COMPILED FROM WIRE REPORTS · WEDNESDAY 18 NOVEMBER 2026",
              26, ly, INK2)
     right = "AN ENTRY FOR MAKE.FUN'S DAILY WORLD-NEWS BOUNTY"
     rw = txt.width("micro", right)
@@ -1474,6 +1551,8 @@ def main():
 
     cv = Canvas(W, H, PAPER)
     draw_masthead(cv, txt)
+    draw_number_strip(cv, txt)
+    draw_region_bar(cv, txt)
     draw_hero(cv, txt)
     draw_grid(cv, txt)
     draw_bottom(cv, txt, land)
