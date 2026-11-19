@@ -1088,8 +1088,8 @@ def draw_region_bar(cv, txt):
         lw = txt.width("micro", label)
         # white on the dark muted segments; ink on the light ones
         fg = INK if col in (GOLD, YELLOW) else WHITE
-        txt.draw(cv, "micro", label, sx + (segw - lw) / 2,
-                 BAR_TOP + (BAR_H - mlh) / 2, fg)
+        txt.draw(cv, "micro", label, int(sx + (segw - lw) / 2),
+                 int(BAR_TOP + (BAR_H - mlh) / 2), fg)
 
 def draw_hero(cv, txt):
     x0, x1 = 26, 590
