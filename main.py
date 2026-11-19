@@ -990,6 +990,34 @@ def draw_card(cv, txt, x, y, w, h, card):
 # --------------------------------------------------------------------------
 # layout
 # --------------------------------------------------------------------------
+def card_region(card):
+    """Map a card's headline tag to one of REGION_ORDER."""
+    tag = card[0]
+    head = tag.split("·", 1)[0].strip().upper()
+    if head.startswith("EUROPE"):
+        return "Europe"
+    if head.startswith("AMERICAS"):
+        return "Americas"
+    if head.startswith("ASIA"):
+        return "Asia"
+    if head.startswith("MIDDLE EAST"):
+        return "Middle East"
+    if head.startswith("AFRICA"):
+        return "Africa"
+    if head.startswith("OCEANIA"):
+        return "Oceania"
+    return "World"
+
+def region_counts():
+    """Stories per region, summed from the very same lists the page draws."""
+    counts = {r: 0 for r in REGION_ORDER}
+    counts[HERO_REGION] = counts.get(HERO_REGION, 0) + 1
+    for card in CARDS:
+        counts[card_region(card)] = counts.get(card_region(card), 0) + 1
+    for r in BRIEF_REGIONS:
+        counts[r] = counts.get(r, 0) + 1
+    return counts
+
 def story_count():
     """Total number of distinct stories shown on the page.
 
@@ -1117,6 +1145,40 @@ LEGEND_L1 = ("1 QESHM · 2 KERCH · 3 SHENZHEN · 4 BENGAL · 5 TALLINN "
              "· 6 SANTA CLARA")
 LEGEND_L2 = ("7 JERUSALEM · 8 KYIV · 9 CONAKRY · 10 KINSHASA · 11 IRKUTSK "
              "· 12 TOKYO")
+
+# --------------------------------------------------------------------------
+# story metadata: region tags and the day's quantified headlines
+# --------------------------------------------------------------------------
+# Region vocabulary, in the fixed order the region bar lists them.
+REGION_ORDER = ["Europe", "Americas", "Asia", "Middle East",
+                "Africa", "Oceania", "World"]
+
+# The lead story's region; the cards carry their region in the tag string.
+HERO_REGION = "Middle East"
+
+# One region per brief, in the same order as BRIEFS.  Region counts are summed
+# from these lists plus the hero and the cards, so the region bar and the
+# masthead total can never diverge.
+BRIEF_REGIONS = [
+    "Europe", "Africa", "Africa", "Asia", "Americas", "Americas",
+    "Middle East", "Europe", "Americas", "World", "World", "World",
+    "Asia", "Middle East", "World", "Asia", "Africa", "Europe",
+    "Asia", "Europe", "Americas", "World", "Americas", "Middle East",
+    "Europe", "Europe", "Europe", "Americas", "Asia", "Middle East",
+    "Middle East", "Americas", "Asia", "Europe", "Asia", "World",
+    "Asia", "Middle East", "Middle East", "Europe",
+]
+
+# One quantified headline per column of the DAY IN NUMBERS strip.  Each figure
+# is drawn bold red with a small dark-grey capitals label beneath it.
+NUMBERS = [
+    ("224", "JAILED IN GUINEA"),
+    ("45BN", "EURO LOAN TO KYIV"),
+    ("251-11", "SPEAKER VOTE"),
+    ("11,000", "EBOLA CASES"),
+    ("25.9BN KM", "VOYAGER 1 OUT"),
+    ("19", "DEAD IN SIBERIA CRASH"),
+]
 
 # bottom edge (y) available to the briefs grid on the left panel; sits just
 # above the footer rule at y=930 so no brief can run into the footer.
